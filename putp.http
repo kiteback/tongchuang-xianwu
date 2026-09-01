@@ -1,0 +1,11 @@
+PUT http://localhost:8081/products/6
+Content-Type:application/json
+
+
+{
+  "title": "状态规则测试",
+  "description": "普通用户尝试设置已售出",
+  "price": 50,
+  "category": "数码",
+  "status": 2
+}

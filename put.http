@@ -1,0 +1,6 @@
+PUT http://localhost:8080/users/3
+Content-Type: application/json
+
+{
+  "nickname": "USER越权测试"
+}

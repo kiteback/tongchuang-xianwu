@@ -1,0 +1,11 @@
+POST http://localhost:8081/products
+Content-Type: application/json
+
+
+{
+  "title": "所有权保护测试",
+  "description": "测试put不能修改userId",
+  "price": 40,
+  "category": "数码",
+  "status": 1
+}
