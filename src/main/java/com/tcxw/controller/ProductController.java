@@ -6,16 +6,20 @@ import com.tcxw.service.ProductService;
 import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-
+import com.tcxw.service.ProductSearchService;
+import com.tcxw.document.ProductDocument;
+import java.util.List;
 
 @RestController
 @RequestMapping("/products")
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductSearchService productSearchService;
 
-    public ProductController(ProductService productService){
+    public ProductController(ProductService productService,ProductSearchService productSearchService){
         this.productService = productService;
+        this.productSearchService = productSearchService;
     }
 
     @GetMapping("/{id}")
@@ -29,6 +33,11 @@ public class ProductController {
 
 
         return productService.getAll(page,size);
+    }
+
+    @GetMapping("/search")
+    public List<ProductDocument> search(@RequestParam String keyword){
+        return productSearchService.search(keyword);
     }
 
     @PostMapping

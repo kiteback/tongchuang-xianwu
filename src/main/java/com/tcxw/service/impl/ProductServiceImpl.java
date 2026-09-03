@@ -1,5 +1,6 @@
 package com.tcxw.service.impl;
 
+import com.tcxw.document.ProductDocument;
 import com.tcxw.entity.Product;
 import com.tcxw.mapper.ProductMapper;
 import com.tcxw.service.ProductService;
@@ -10,6 +11,7 @@ import com.tcxw.exception.UnauthorizedException;
 import com.tcxw.exception.ForbiddenException;
 import com.tcxw.exception.NotFoundException;
 import com.tcxw.exception.BusinessException;
+import com.tcxw.repository.ProductDocumentRepository;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
@@ -19,10 +21,12 @@ public class ProductServiceImpl implements ProductService {
 
     private final ProductMapper productMapper;
     private final UserMapper userMapper;
+    private final ProductDocumentRepository productDocumentRepository;
 
-    public ProductServiceImpl(ProductMapper productMapper, UserMapper userMapper) {
+    public ProductServiceImpl(ProductMapper productMapper, UserMapper userMapper, ProductDocumentRepository productDocumentRepository) {
         this.productMapper = productMapper;
         this.userMapper = userMapper;
+        this.productDocumentRepository = productDocumentRepository;
     }
 
     @Override
@@ -55,6 +59,17 @@ public class ProductServiceImpl implements ProductService {
         product.setUserId(user.getId());
         product.setStatus(1);
         productMapper.insert(product);
+
+        ProductDocument document = new ProductDocument();
+        document.setId(product.getId());
+        document.setUserId(product.getUserId());
+        document.setTitle(product.getTitle());
+        document.setDescription(product.getDescription());
+        document.setPrice(product.getPrice());
+        document.setCategory(product.getCategory());
+        document.setStatus(product.getStatus());
+
+        productDocumentRepository.save(document);
     }
 
     @Override
@@ -85,6 +100,20 @@ public class ProductServiceImpl implements ProductService {
 
         }
         productMapper.updateById(product);
+
+        Product updatedProduct = productMapper.selectById(product.getId());
+
+        ProductDocument document = new ProductDocument();
+        document.setId(updatedProduct.getId());
+        document.setUserId(updatedProduct.getUserId());
+        document.setTitle(updatedProduct.getTitle());
+        document.setDescription(updatedProduct.getDescription());
+        document.setPrice(updatedProduct.getPrice());
+        document.setCategory(updatedProduct.getCategory());
+        document.setStatus(updatedProduct.getStatus());
+
+        productDocumentRepository.save(document);
+
     }
 
     @Override
@@ -107,5 +136,8 @@ public class ProductServiceImpl implements ProductService {
             throw new ForbiddenException("无权删除该商品");
         }
         productMapper.deleteById(id);
+
+        productDocumentRepository.deleteById(id);
     }
+
 }
