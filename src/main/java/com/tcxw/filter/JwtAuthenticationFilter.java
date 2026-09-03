@@ -13,6 +13,12 @@ import java.io.IOException;
 
 public class JwtAuthenticationFilter implements Filter {
 
+    private final JwtUtil jwtUtil;
+
+    public JwtAuthenticationFilter(JwtUtil jwtUtil) {
+        this.jwtUtil = jwtUtil;
+    }
+
     @Override
     public void doFilter(
             ServletRequest request,
@@ -27,38 +33,54 @@ public class JwtAuthenticationFilter implements Filter {
 
         String path = httpRequest.getRequestURI();
 
-        if ("/login".equals(path) || "/register".equals(path)) {
+        if ("/login".equals(path)
+                || "/register".equals(path)
+                || "/redis-get".equals(path)
+                || "/redis-test".equals(path)) {
+
             chain.doFilter(request, response);
             return;
         }
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"message\":\"请先登录\"}");
+            httpResponse.setContentType("application/json;charset=UTF-8");
+            httpResponse.getWriter().write("{\"message\":\"请先登录\"}");
             return;
         }
-        try{
+
+        String username;
+        String role;
+        Long userId;
+
+        try {
             String token = authHeader.substring(7);
-            String username = JwtUtil.getUsername(token);
-            System.out.println("Jwt用户：" + username);
-            httpRequest.setAttribute("username",username);
 
-            String role = JwtUtil.getRole(token);
-            System.out.println("Jwt角色："+role);
-            httpRequest.setAttribute("role",role);
+            username = jwtUtil.getUsername(token);
+            role = jwtUtil.getRole(token);
+            userId = jwtUtil.getUserId(token);
 
-            Long userId = JwtUtil.getUserId(token);
-            System.out.println("Jwt用户ID：" + userId);
-            httpRequest.setAttribute("userId",userId);
+        } catch (Exception e) {
 
-            chain.doFilter(request, response);
-        }catch (Exception e){
+            System.out.println("========== JWT验证异常 ==========");
+            e.printStackTrace();
+            System.out.println("================================");
+
             httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             httpResponse.setContentType("application/json;charset=UTF-8");
             httpResponse.getWriter().write("{\"message\":\"Token无效或已过期\"}");
-
+            return;
         }
+
+        System.out.println("Jwt用户：" + username);
+        httpRequest.setAttribute("username", username);
+
+        System.out.println("Jwt角色：" + role);
+        httpRequest.setAttribute("role", role);
+
+        System.out.println("Jwt用户ID：" + userId);
+        httpRequest.setAttribute("userId", userId);
+
+        chain.doFilter(request, response);
     }
 }
-

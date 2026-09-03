@@ -1,2 +1,1 @@
-PUT http://localhost:8081/orders/2/pay
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0MDA3IiwidXNlcklkIjo5LCJyb2xlIjoiVVNFUiIsImlhdCI6MTc4ODI0NTYwNywiZXhwIjoxNzg4MzMyMDA3fQ.YEumbbGpM_FT0J-wpOMa33NpDWtHwio9t3cVpZOWBZs
+PUT http://localhost:8081/orders/4/pay

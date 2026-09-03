@@ -1,6 +1,6 @@
-PUT http://localhost:8080/users/3
+PUT http://localhost:8081/users/9
 Content-Type: application/json
 
 {
-  "nickname": "USER越权测试"
+  "nickname": "Redis缓存测试"
 }

@@ -1,10 +1,10 @@
 POST http://localhost:8081/products
 Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0MDAzIiwidXNlcklkIjozLCJyb2xlIjoiQURNSU4iLCJpYXQiOjE3ODgyMzMxNzksImV4cCI6MTc4ODMxOTU3OX0.OgjRNXwKCxj0Iw8MEqLVgHurTa_Iz6LT6Bbjj7MY2RQ
 
 {
-  "title": "订单测试商品",
+  "title": "订单购买测试商品2",
   "description": "用于测试订单创建",
   "price": 99.00,
-  "category": "数码"
+  "category": "数码",
+  "status": 1
 }
