@@ -3,6 +3,8 @@ package com.tcxw.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcxw.dto.OrderCreateRequest;
 import com.tcxw.entity.Order;
+import com.tcxw.producer.OrderMessageProducer;
+import com.tcxw.message.OrderMessage;
 import com.tcxw.entity.Product;
 import com.tcxw.entity.User;
 import com.tcxw.exception.BusinessException;
@@ -26,13 +28,16 @@ public class OrderServiceImpl implements OrderService {
     private final OrderMapper orderMapper;
     private final ProductMapper productMapper;
     private final UserMapper userMapper;
+    private final OrderMessageProducer orderMessageProducer;
 
     public OrderServiceImpl(OrderMapper orderMapper,
                             ProductMapper productMapper,
-                            UserMapper userMapper) {
+                            UserMapper userMapper,
+                            OrderMessageProducer orderMessageProducer) {
         this.orderMapper = orderMapper;
         this.productMapper = productMapper;
         this.userMapper = userMapper;
+        this.orderMessageProducer = orderMessageProducer;
     }
 
     @Override
@@ -55,6 +60,13 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessException("商品当前不可购买");
         }
 
+        int productUpdated = productMapper.updateStatusIfAvailable(
+                product.getId(),2
+        );
+        if(productUpdated == 0){
+            throw new BusinessException("商品已被其他用户锁定");
+        }
+
         if (product.getUserId().equals(buyer.getId())) {
             throw new BusinessException("不能购买自己的商品");
         }
@@ -71,6 +83,16 @@ public class OrderServiceImpl implements OrderService {
         order.setUpdateTime(LocalDateTime.now());
 
         orderMapper.insert(order);
+
+        OrderMessage message = new OrderMessage(
+                order.getId(),
+                buyer.getId(),
+                "ORDER_CREATED"
+        );
+
+        orderMessageProducer.sendOrderCreatedMessage(message);
+        orderMessageProducer.sendOrderTimeoutMessage(message);
+
 
         return order;
     }
@@ -148,19 +170,16 @@ public class OrderServiceImpl implements OrderService {
             throw new NotFoundException("商品不存在");
         }
 
-        if (!Integer.valueOf(1).equals(product.getStatus())) {
-            throw new BusinessException("商品已不可购买");
+        if(!Integer.valueOf(2).equals(product.getStatus())){
+            throw new BusinessException("商品当前不是待支付状态");
         }
 
-        int updated = productMapper.updateStatusIfAvailable(
+        int updated = productMapper.updateStatusIfLocked(
                 product.getId(),
-                2
-        );
-
-        if (updated == 0) {
-            throw new BusinessException("商品已被其他用户购买");
+                3);
+        if(updated == 0){
+            throw new BusinessException("商品状态已发生变化");
         }
-
         order.setStatus(2);
         order.setUpdateTime(LocalDateTime.now());
 
@@ -191,6 +210,10 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessException("当前订单不能取消");
         }
 
+        int updated = productMapper.releaseLockedProduct(order.getProductId(),1);
+        if(updated == 0){
+            throw new BusinessException("商品状态已发生变化");
+        }
         order.setStatus(4);
         order.setUpdateTime(LocalDateTime.now());
 

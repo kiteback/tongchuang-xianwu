@@ -16,4 +16,22 @@ public interface ProductMapper extends BaseMapper<Product> {
               AND status = 1
             """)
     int updateStatusIfAvailable(Long id, Integer status);
+
+    @Update("""
+        UPDATE product
+        SET status = #{status},
+            update_time = NOW()
+        WHERE id = #{id}
+          AND status = 2
+        """)
+    int updateStatusIfLocked(Long id, Integer status);
+
+    @Update("""
+        UPDATE product
+        SET status = #{status},
+            update_time = NOW()
+        WHERE id = #{id}
+          AND status = 2
+        """)
+    int releaseLockedProduct(Long id, Integer status);
 }
