@@ -1,3 +1,2 @@
 ### RabbitMQ结构化消息测试
 GET http://localhost:8081/rabbitmq-test?orderId=100&userId=9
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0MDA3IiwidXNlcklkIjo5LCJyb2xlIjoiVVNFUiIsImlhdCI6MTc4ODQxNjc4NCwiZXhwIjoxNzg4NTAzMTg0fQ.aHdeJ1qXHcqlp47m45vW0CZDw5Izgx6kmJ7F7258MoU

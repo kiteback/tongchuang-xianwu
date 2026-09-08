@@ -1,11 +1,9 @@
-PUT http://localhost:8081/products/6
+PUT http://localhost:8081/products/10
 Content-Type:application/json
 
-
 {
-  "title": "状态规则测试",
-  "description": "普通用户尝试设置已售出",
-  "price": 50,
+  "title": "ES修改同步测试",
+  "description": "测试商品修改后同步到Elasticsearch",
   "category": "数码",
-  "status": 2
+  "price": 88.88
 }

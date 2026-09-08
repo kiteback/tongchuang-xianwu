@@ -2,9 +2,8 @@ POST http://localhost:8081/products
 Content-Type: application/json
 
 {
-  "title": "订单购买测试商品2",
-  "description": "用于测试订单创建",
-  "price": 99.00,
-  "category": "数码",
-  "status": 1
+  "title": "ES同步测试商品",
+  "description": "用于测试Elasticsearch同步",
+  "price": 99.99,
+  "category": "数码"
 }

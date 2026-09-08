@@ -1,2 +1,2 @@
 ### 删除商品
-DELETE http://localhost:8081/products/6
+DELETE http://localhost:8081/products/10

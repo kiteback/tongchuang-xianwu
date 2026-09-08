@@ -1,1 +1,1 @@
-GET http://localhost:8081/users/9
+GET http://localhost/hello
