@@ -11,9 +11,9 @@
 	<groupId>com.tcxw</groupId>
 	<artifactId>tongchuang-xianwu</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name/>
-	<description/>
-	<url/>
+	<name>同窗闲物</name>
+	<description>基于 Spring Boot 的校园二手交易平台</description>
+	<url>https://github.com/kiteback/tongchuang-xianwu</url>
 	<licenses>
 		<license/>
 	</licenses>
