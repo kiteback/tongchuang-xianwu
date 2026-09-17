@@ -1,79 +1,98 @@
 package com.tcxw.controller;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.tcxw.entity.Product;
+import com.tcxw.annotation.RequireRole;
+import com.tcxw.document.ProductDocument;
+import com.tcxw.dto.PageResponse;
+import com.tcxw.dto.ProductCreateRequest;
+import com.tcxw.dto.ProductResponse;
+import com.tcxw.dto.ProductUpdateRequest;
+import com.tcxw.service.ProductIndexService;
+import com.tcxw.service.ProductSearchService;
 import com.tcxw.service.ProductService;
-import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import com.tcxw.service.ProductSearchService;
-import com.tcxw.document.ProductDocument;
-import java.util.List;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
+import java.util.Map;
+
+@Validated
 @RestController
 @RequestMapping("/products")
 public class ProductController {
 
     private final ProductService productService;
     private final ProductSearchService productSearchService;
+    private final ProductIndexService productIndexService;
 
-    public ProductController(ProductService productService,ProductSearchService productSearchService){
+    public ProductController(ProductService productService,
+                             ProductSearchService productSearchService,
+                             ProductIndexService productIndexService) {
         this.productService = productService;
         this.productSearchService = productSearchService;
+        this.productIndexService = productIndexService;
     }
 
     @GetMapping("/{id}")
-    public Product getById(@PathVariable Long id){
-        return productService.getById(id);
+    public ProductResponse getById(@PathVariable Long id) {
+        return ProductResponse.from(productService.getById(id));
     }
 
     @GetMapping
-    public IPage<Product> getAll(@RequestParam(defaultValue = "1") int page,
-                                 @RequestParam(defaultValue = "10") int size ){
-
-
-        return productService.getAll(page,size);
+    public PageResponse<ProductResponse> getAll(
+            @RequestParam(defaultValue = "1") @Min(1) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size) {
+        return PageResponse.from(productService.getAll(page, size), ProductResponse::from);
     }
 
     @GetMapping("/search")
-    public List<ProductDocument> search(@RequestParam String keyword){
-        return productSearchService.search(keyword);
+    public PageResponse<ProductDocument> search(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(defaultValue = "1") @Min(1) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size) {
+        return productSearchService.search(keyword, category, minPrice, maxPrice, status, page, size);
     }
 
     @PostMapping
-    public String add(@RequestBody @Valid Product product,
-                      HttpServletRequest request){
-        String username = (String) request.getAttribute("username");
-
-        productService.add(product,username);
-
-        return "商品添加成功";
+    public ProductResponse add(@Valid @RequestBody ProductCreateRequest body,
+                               HttpServletRequest request) {
+        return ProductResponse.from(productService.add(body, username(request)));
     }
 
     @PutMapping("/{id}")
-    public String update(
-            @PathVariable Long id,
-            @RequestBody @Valid Product product,
-            HttpServletRequest request){
-
-        String username = (String) request.getAttribute("username");
-
-        product.setId(id);
-        productService.update(product, username);
-
-        return "商品修改成功";
+    public ProductResponse update(@PathVariable Long id,
+                                  @Valid @RequestBody ProductUpdateRequest body,
+                                  HttpServletRequest request) {
+        return ProductResponse.from(productService.update(id, body, username(request)));
     }
 
     @DeleteMapping("/{id}")
-    public String delete(@PathVariable Long id,
-                         HttpServletRequest request){
-        String username = (String) request.getAttribute("username");
-
-        productService.delete(id,username);
-
-        return "商品删除成功";
+    public void delete(@PathVariable Long id, HttpServletRequest request) {
+        productService.delete(id, username(request));
     }
 
+    @RequireRole("ADMIN")
+    @PostMapping("/search/rebuild")
+    public Map<String, Long> rebuildIndex() {
+        return Map.of("indexed", productIndexService.rebuild());
+    }
 
-
+    private String username(HttpServletRequest request) {
+        return (String) request.getAttribute("username");
+    }
 }

@@ -1,86 +1,95 @@
 package com.tcxw.filter;
 
+import com.tcxw.entity.User;
+import com.tcxw.enums.UserStatus;
+import com.tcxw.exception.ErrorResponse;
+import com.tcxw.mapper.UserMapper;
 import com.tcxw.utils.JwtUtil;
-import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.web.filter.OncePerRequestFilter;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 
-public class JwtAuthenticationFilter implements Filter {
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final JwtUtil jwtUtil;
+    private final UserMapper userMapper;
+    private final ObjectMapper objectMapper;
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil) {
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, UserMapper userMapper, ObjectMapper objectMapper) {
         this.jwtUtil = jwtUtil;
+        this.userMapper = userMapper;
+        this.objectMapper = objectMapper;
     }
 
     @Override
-    public void doFilter(
-            ServletRequest request,
-            ServletResponse response,
-            FilterChain chain
-    ) throws IOException, ServletException {
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        String method = request.getMethod();
+        return HttpMethod.OPTIONS.matches(method)
+                || (HttpMethod.POST.matches(method) && ("/login".equals(path) || "/register".equals(path)))
+                || (HttpMethod.GET.matches(method) && (path.equals("/products") || path.startsWith("/products/")))
+                || "/actuator/health".equals(path);
+    }
 
-        HttpServletRequest httpRequest = (HttpServletRequest) request;
-        HttpServletResponse httpResponse = (HttpServletResponse) response;
-
-        String authHeader = httpRequest.getHeader("Authorization");
-
-        String path = httpRequest.getRequestURI();
-
-        if ("/login".equals(path)
-                || "/register".equals(path)
-                || "/redis-get".equals(path)
-                || "/redis-test".equals(path)) {
-
-            chain.doFilter(request, response);
-            return;
-        }
-
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+        String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            httpResponse.setContentType("application/json;charset=UTF-8");
-            httpResponse.getWriter().write("{\"message\":\"请先登录\"}");
+            writeUnauthorized(response, request, "请先登录");
             return;
         }
 
-        String username;
-        String role;
-        Long userId;
-
+        User user;
         try {
             String token = authHeader.substring(7);
+            Long userId = jwtUtil.getUserId(token);
+            String tokenUsername = jwtUtil.getUsername(token);
+            user = userMapper.selectById(userId);
 
-            username = jwtUtil.getUsername(token);
-            role = jwtUtil.getRole(token);
-            userId = jwtUtil.getUserId(token);
+            if (user == null || !Integer.valueOf(UserStatus.ACTIVE.getCode()).equals(user.getStatus())) {
+                writeUnauthorized(response, request, "用户不存在或已被禁用");
+                return;
+            }
+            if (!user.getUsername().equals(tokenUsername)) {
+                writeUnauthorized(response, request, "Token用户信息无效");
+                return;
+            }
 
-        } catch (Exception e) {
-
-            System.out.println("========== JWT验证异常 ==========");
-            e.printStackTrace();
-            System.out.println("================================");
-
-            httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            httpResponse.setContentType("application/json;charset=UTF-8");
-            httpResponse.getWriter().write("{\"message\":\"Token无效或已过期\"}");
+        } catch (Exception exception) {
+            log.debug("JWT validation failed", exception);
+            writeUnauthorized(response, request, "Token无效或已过期");
             return;
         }
 
-        System.out.println("Jwt用户：" + username);
-        httpRequest.setAttribute("username", username);
+        // Keep downstream controller/service exceptions outside the JWT catch block.
+        request.setAttribute("username", user.getUsername());
+        request.setAttribute("role", user.getRole());
+        request.setAttribute("userId", user.getId());
+        filterChain.doFilter(request, response);
+    }
 
-        System.out.println("Jwt角色：" + role);
-        httpRequest.setAttribute("role", role);
-
-        System.out.println("Jwt用户ID：" + userId);
-        httpRequest.setAttribute("userId", userId);
-
-        chain.doFilter(request, response);
+    private void writeUnauthorized(HttpServletResponse response,
+                                   HttpServletRequest request,
+                                   String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(
+                response.getOutputStream(),
+                ErrorResponse.of("UNAUTHORIZED", message, request.getRequestURI())
+        );
     }
 }

@@ -1,6 +1,7 @@
 package com.tcxw.interceptor;
 
 import com.tcxw.annotation.RequireRole;
+import com.tcxw.exception.ForbiddenException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -24,14 +25,8 @@ public class RoleInterceptor implements HandlerInterceptor {
 
         String role = (String) request.getAttribute("role");
 
-        System.out.println("权限检查：当前角色 = " + role);
-        System.out.println("权限检查：需要角色 = " + requireRole.value());
-
         if (!requireRole.value().equals(role)) {
-            response.setStatus(401);
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"message\":\"没有权限访问\"}");
-            return false;
+            throw new ForbiddenException("没有权限访问");
         }
 
         return true;

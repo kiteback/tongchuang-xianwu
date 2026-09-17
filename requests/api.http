@@ -1,0 +1,78 @@
+@baseUrl = http://localhost:8081
+@token = replace-with-login-token
+@productId = 1
+@orderId = 1
+
+### 注册
+POST {{baseUrl}}/register
+Content-Type: application/json
+
+{
+  "username": "alice",
+  "password": "password123",
+  "nickname": "Alice",
+  "phone": ""
+}
+
+### 登录
+POST {{baseUrl}}/login
+Content-Type: application/json
+
+{
+  "username": "alice",
+  "password": "password123"
+}
+
+### 发布商品
+POST {{baseUrl}}/products
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Java核心技术教材",
+  "description": "九成新，无笔记",
+  "price": 35.00,
+  "category": "教材"
+}
+
+### 商品分页
+GET {{baseUrl}}/products?page=1&size=10
+
+### 多条件搜索
+GET {{baseUrl}}/products/search?keyword=Java&category=教材&minPrice=10&maxPrice=100&status=1&page=1&size=10
+
+### 修改商品
+PUT {{baseUrl}}/products/{{productId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "price": 30.00,
+  "description": "降价出售"
+}
+
+### 创建订单
+POST {{baseUrl}}/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "productId": {{productId}}
+}
+
+### 支付订单
+PUT {{baseUrl}}/orders/{{orderId}}/pay
+Authorization: Bearer {{token}}
+
+### 取消订单
+PUT {{baseUrl}}/orders/{{orderId}}/cancel
+Authorization: Bearer {{token}}
+
+### AI商品查询（需要AI_CHAT_MODEL=openai）
+POST {{baseUrl}}/ai/products/query
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "question": "帮我找一本价格不太贵的Java教材"
+}

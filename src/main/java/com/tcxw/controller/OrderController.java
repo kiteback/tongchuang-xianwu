@@ -1,13 +1,20 @@
 package com.tcxw.controller;
 
 import com.tcxw.dto.OrderCreateRequest;
-import com.tcxw.entity.Order;
+import com.tcxw.dto.OrderResponse;
 import com.tcxw.service.OrderService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/orders")
@@ -20,54 +27,34 @@ public class OrderController {
     }
 
     @PostMapping
-    public Order create(
-            @RequestBody @Valid OrderCreateRequest request,
-            HttpServletRequest httpRequest) {
-
-        String username = (String) httpRequest.getAttribute("username");
-
-        return orderService.create(request, username);
+    public OrderResponse create(@RequestBody @Valid OrderCreateRequest body,
+                                HttpServletRequest request) {
+        return orderService.create(body, username(request));
     }
 
     @GetMapping("/{id}")
-    public Order getById(
-            @PathVariable Long id,
-            HttpServletRequest httpRequest) {
-
-        String username = (String) httpRequest.getAttribute("username");
-
-        return orderService.getById(id, username);
+    public OrderResponse getById(@PathVariable Long id, HttpServletRequest request) {
+        return orderService.getById(id, username(request));
     }
 
     @GetMapping("/my")
-    public List<Order> getMyOrders(HttpServletRequest httpRequest) {
-
-        String username = (String) httpRequest.getAttribute("username");
-
-        return orderService.getMyOrders(username);
+    public List<OrderResponse> getMyOrders(HttpServletRequest request) {
+        return orderService.getMyOrders(username(request));
     }
 
     @PutMapping("/{id}/pay")
-    public String pay(
-            @PathVariable Long id,
-            HttpServletRequest httpRequest) {
-
-        String username = (String) httpRequest.getAttribute("username");
-
-        orderService.pay(id, username);
-
-        return "订单支付成功";
+    public Map<String, String> pay(@PathVariable Long id, HttpServletRequest request) {
+        orderService.pay(id, username(request));
+        return Map.of("message", "订单支付成功");
     }
 
     @PutMapping("/{id}/cancel")
-    public String cancel(
-            @PathVariable Long id,
-            HttpServletRequest httpRequest) {
+    public Map<String, String> cancel(@PathVariable Long id, HttpServletRequest request) {
+        orderService.cancel(id, username(request));
+        return Map.of("message", "订单取消成功");
+    }
 
-        String username = (String) httpRequest.getAttribute("username");
-
-        orderService.cancel(id, username);
-
-        return "订单取消成功";
+    private String username(HttpServletRequest request) {
+        return (String) request.getAttribute("username");
     }
 }

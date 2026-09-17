@@ -1,8 +1,9 @@
 package com.tcxw.service;
 
 import com.tcxw.dto.LoginResponse;
+import com.tcxw.dto.RegisterRequest;
+import com.tcxw.dto.UserUpdateRequest;
 import com.tcxw.dto.UserResponse;
-import com.tcxw.entity.User;
 
 import java.util.List;
 
@@ -11,9 +12,9 @@ public interface UserService {
 
     List<UserResponse> getAll();
 
-    UserResponse add(User user);
+    UserResponse register(RegisterRequest request);
 
-    User update(User user);
+    UserResponse update(Long id, UserUpdateRequest request);
 
     void delete(Long id);
 

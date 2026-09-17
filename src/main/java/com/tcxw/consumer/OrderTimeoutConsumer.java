@@ -1,9 +1,13 @@
 package com.tcxw.consumer;
 
+import com.tcxw.config.RabbitMQConfig;
 import com.tcxw.entity.Order;
+import com.tcxw.enums.ProductStatus;
 import com.tcxw.mapper.OrderMapper;
 import com.tcxw.mapper.ProductMapper;
 import com.tcxw.message.OrderMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,53 +15,39 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class OrderTimeoutConsumer {
 
+    private static final Logger log = LoggerFactory.getLogger(OrderTimeoutConsumer.class);
+
     private final OrderMapper orderMapper;
     private final ProductMapper productMapper;
 
-    @RabbitListener(queues = "order.timeout.handler.queue")
+    public OrderTimeoutConsumer(OrderMapper orderMapper, ProductMapper productMapper) {
+        this.orderMapper = orderMapper;
+        this.productMapper = productMapper;
+    }
+
+    @RabbitListener(queues = RabbitMQConfig.ORDER_TIMEOUT_HANDLER_QUEUE)
     @Transactional
     public void handleTimeout(OrderMessage message) {
-
         Order order = orderMapper.selectById(message.getOrderId());
-
         if (order == null) {
-            System.out.println("订单不存在：orderId=" + message.getOrderId());
+            log.warn("Ignoring timeout event {} because order {} does not exist",
+                    message.getEventId(), message.getOrderId());
             return;
         }
 
-        if(!Integer.valueOf(1).equals(order.getStatus())){
-            System.out.println(
-                    "订单当前无需超时处理：orderId=" + order.getId()
-                    + ", status=" + order.getStatus()
-            );
-            return;
-        }
-
+        // All terminal order operations lock/update the order row first, then the product row.
         int orderUpdated = orderMapper.cancelIfPending(order.getId());
-
         if (orderUpdated == 0) {
+            log.info("Ignoring duplicate or obsolete timeout event {} for order {}",
+                    message.getEventId(), order.getId());
             return;
         }
 
         int productUpdated = productMapper.releaseLockedProduct(
-                order.getProductId(),
-                1
-        );
-
+                order.getProductId(), ProductStatus.AVAILABLE.getCode());
         if (productUpdated == 0) {
-            throw new RuntimeException("商品释放失败");
+            throw new IllegalStateException("订单已取消但商品释放失败，事务将回滚");
         }
-
-        System.out.println(
-                "订单超时取消成功：orderId=" + order.getId()
-                        + ", productId=" + order.getProductId()
-        );
-
-    }
-
-    public OrderTimeoutConsumer(OrderMapper orderMapper,
-                             ProductMapper productMapper){
-        this.orderMapper = orderMapper;
-        this.productMapper = productMapper;
+        log.info("Cancelled timed-out order {} and released product {}", order.getId(), order.getProductId());
     }
 }

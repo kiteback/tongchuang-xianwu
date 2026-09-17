@@ -1,9 +1,0 @@
-POST http://localhost:8081/products
-Content-Type: application/json
-
-{
-  "title": "ES同步测试商品",
-  "description": "用于测试Elasticsearch同步",
-  "price": 99.99,
-  "category": "数码"
-}

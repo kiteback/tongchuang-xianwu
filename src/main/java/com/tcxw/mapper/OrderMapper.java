@@ -16,4 +16,13 @@ public interface OrderMapper extends BaseMapper<Order> {
             AND status = 1
 """)
     int cancelIfPending(Long id);
+
+    @Update("""
+            UPDATE orders
+            SET status = 2,
+                update_time = NOW()
+            WHERE id = #{id}
+              AND status = 1
+            """)
+    int markPaidIfPending(Long id);
 }

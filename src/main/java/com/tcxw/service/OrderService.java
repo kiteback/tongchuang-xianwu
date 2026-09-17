@@ -1,17 +1,17 @@
 package com.tcxw.service;
 
 import com.tcxw.dto.OrderCreateRequest;
-import com.tcxw.entity.Order;
+import com.tcxw.dto.OrderResponse;
 
 import java.util.List;
 
 public interface OrderService {
 
-    Order create(OrderCreateRequest request, String username);
+    OrderResponse create(OrderCreateRequest request, String username);
 
-    Order getById(Long id, String username);
+    OrderResponse getById(Long id, String username);
 
-    List<Order> getMyOrders(String username);
+    List<OrderResponse> getMyOrders(String username);
 
     void pay(Long id, String username);
 

@@ -1,6 +1,0 @@
-PUT http://localhost:8081/users/9
-Content-Type: application/json
-
-{
-  "nickname": "Redis缓存测试"
-}

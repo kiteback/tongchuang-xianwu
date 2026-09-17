@@ -1,9 +1,0 @@
-PUT http://localhost:8081/products/10
-Content-Type:application/json
-
-{
-  "title": "ES修改同步测试",
-  "description": "测试商品修改后同步到Elasticsearch",
-  "category": "数码",
-  "price": 88.88
-}

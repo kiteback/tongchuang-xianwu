@@ -2,6 +2,7 @@ package com.tcxw.utils;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -13,9 +14,17 @@ import java.util.Date;
 public class JwtUtil {
 
     private final String secret;
+    private final long expiration;
 
-    public JwtUtil(@Value("${jwt.secret}") String secret) {
+    @Autowired
+    public JwtUtil(@Value("${jwt.secret}") String secret,
+                   @Value("${jwt.expiration:86400000}") long expiration) {
         this.secret = secret;
+        this.expiration = expiration;
+    }
+
+    public JwtUtil(String secret) {
+        this(secret, 86_400_000L);
     }
 
     private SecretKey getKey() {
@@ -31,7 +40,7 @@ public class JwtUtil {
                 .claim("userId", userId)
                 .claim("role", role)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + 86400000))
+                .expiration(new Date(System.currentTimeMillis() + expiration))
                 .signWith(getKey())
                 .compact();
     }

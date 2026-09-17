@@ -1,23 +1,74 @@
 spring:
+  application:
+    name: tongchuang-xianwu
   datasource:
-    url: jdbc:mysql://host.docker.internal:3306/tongchuang_xianwu?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
-    username: root
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:mysql://localhost:3306/tongchuang_xianwu?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
 
   data:
     redis:
-      host: redis
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
 
   elasticsearch:
-    uris: http://elasticsearch:9200
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
 
   rabbitmq:
-    host: rabbitmq
-    port: 5672
-    username: guest
-    password: guest
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        acknowledge-mode: auto
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+
+  ai:
+    model:
+      chat: ${AI_CHAT_MODEL:none}
+    openai:
+      api-key: ${OPENAI_API_KEY:unused}
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      chat:
+        model: ${OPENAI_MODEL:gpt-5-mini}
+
+server:
+  port: ${SERVER_PORT:8081}
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:change-this-development-secret-at-least-32-characters}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+app:
+  cache:
+    user-ttl: ${USER_CACHE_TTL:30m}
+    null-ttl: ${USER_NULL_CACHE_TTL:2m}
+  order:
+    timeout: ${ORDER_TIMEOUT:30m}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
+
+logging:
+  level:
+    root: INFO
+    com.tcxw: INFO

@@ -2,11 +2,12 @@ package com.tcxw.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.tcxw.dto.OrderCreateRequest;
+import com.tcxw.dto.OrderResponse;
 import com.tcxw.entity.Order;
-import com.tcxw.producer.OrderMessageProducer;
-import com.tcxw.message.OrderMessage;
 import com.tcxw.entity.Product;
 import com.tcxw.entity.User;
+import com.tcxw.enums.OrderStatus;
+import com.tcxw.enums.ProductStatus;
 import com.tcxw.exception.BusinessException;
 import com.tcxw.exception.ForbiddenException;
 import com.tcxw.exception.NotFoundException;
@@ -14,6 +15,8 @@ import com.tcxw.exception.UnauthorizedException;
 import com.tcxw.mapper.OrderMapper;
 import com.tcxw.mapper.ProductMapper;
 import com.tcxw.mapper.UserMapper;
+import com.tcxw.message.OrderMessage;
+import com.tcxw.producer.OrderMessageProducer;
 import com.tcxw.service.OrderService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,181 +45,108 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public Order create(OrderCreateRequest request, String username) {
-
-        User buyer = userMapper.findByUsername(username);
-
-        if (buyer == null) {
-            throw new UnauthorizedException("用户不存在");
-        }
-
+    public OrderResponse create(OrderCreateRequest request, String username) {
+        User buyer = requireUser(username);
         Product product = productMapper.selectById(request.getProductId());
-
         if (product == null) {
             throw new NotFoundException("商品不存在");
         }
-
-        if (!Integer.valueOf(1).equals(product.getStatus())) {
-            throw new BusinessException("商品当前不可购买");
-        }
-
-        int productUpdated = productMapper.updateStatusIfAvailable(
-                product.getId(),2
-        );
-        if(productUpdated == 0){
-            throw new BusinessException("商品已被其他用户锁定");
-        }
-
         if (product.getUserId().equals(buyer.getId())) {
             throw new BusinessException("不能购买自己的商品");
         }
 
-        Order order = new Order();
+        int productUpdated = productMapper.updateStatusIfAvailable(
+                product.getId(), ProductStatus.LOCKED.getCode());
+        if (productUpdated == 0) {
+            throw new BusinessException("商品已被其他用户锁定或不可购买");
+        }
 
+        LocalDateTime now = LocalDateTime.now();
+        Order order = new Order();
         order.setOrderNo(UUID.randomUUID().toString().replace("-", ""));
         order.setBuyerId(buyer.getId());
         order.setSellerId(product.getUserId());
         order.setProductId(product.getId());
         order.setPrice(product.getPrice());
-        order.setStatus(1);
-        order.setCreateTime(LocalDateTime.now());
-        order.setUpdateTime(LocalDateTime.now());
-
+        order.setStatus(OrderStatus.PENDING_PAYMENT.getCode());
+        order.setCreateTime(now);
+        order.setUpdateTime(now);
         orderMapper.insert(order);
 
-        OrderMessage message = new OrderMessage(
-                order.getId(),
-                buyer.getId(),
-                "ORDER_CREATED"
-        );
-
-        orderMessageProducer.sendOrderCreatedMessage(message);
-        orderMessageProducer.sendOrderTimeoutMessage(message);
-
-
-        return order;
+        orderMessageProducer.sendAfterCommit(new OrderMessage(order.getId(), buyer.getId(), "ORDER_CREATED"));
+        return OrderResponse.from(order);
     }
 
     @Override
-    public Order getById(Long id, String username) {
-
-        User user = userMapper.findByUsername(username);
-
-        if (user == null) {
-            throw new UnauthorizedException("用户不存在");
-        }
-
-        Order order = orderMapper.selectById(id);
-
-        if (order == null) {
-            throw new NotFoundException("订单不存在");
-        }
-
+    public OrderResponse getById(Long id, String username) {
+        User user = requireUser(username);
+        Order order = requireOrder(id);
         if (!"ADMIN".equals(user.getRole())
                 && !order.getBuyerId().equals(user.getId())
                 && !order.getSellerId().equals(user.getId())) {
             throw new ForbiddenException("无权查看该订单");
         }
-
-        return order;
+        return OrderResponse.from(order);
     }
 
     @Override
-    public List<Order> getMyOrders(String username) {
-
-        User user = userMapper.findByUsername(username);
-
-        if (user == null) {
-            throw new UnauthorizedException("用户不存在");
-        }
-
+    public List<OrderResponse> getMyOrders(String username) {
+        User user = requireUser(username);
         LambdaQueryWrapper<Order> wrapper = new LambdaQueryWrapper<>();
-
-        wrapper.eq(Order::getBuyerId, user.getId())
-                .or()
-                .eq(Order::getSellerId, user.getId())
+        wrapper.and(query -> query.eq(Order::getBuyerId, user.getId())
+                        .or().eq(Order::getSellerId, user.getId()))
                 .orderByDesc(Order::getCreateTime);
-
-        return orderMapper.selectList(wrapper);
+        return orderMapper.selectList(wrapper).stream().map(OrderResponse::from).toList();
     }
 
     @Override
     @Transactional
     public void pay(Long id, String username) {
-
-        User user = userMapper.findByUsername(username);
-
-        if (user == null) {
-            throw new UnauthorizedException("用户不存在");
-        }
-
-        Order order = orderMapper.selectById(id);
-
-        if (order == null) {
-            throw new NotFoundException("订单不存在");
-        }
-
+        User user = requireUser(username);
+        Order order = requireOrder(id);
         if (!order.getBuyerId().equals(user.getId())) {
             throw new ForbiddenException("只有买家可以支付订单");
         }
 
-        if (!Integer.valueOf(1).equals(order.getStatus())) {
+        // Order first, product second. Cancel and timeout use the same lock order.
+        if (orderMapper.markPaidIfPending(id) == 0) {
             throw new BusinessException("当前订单不能支付");
         }
-
-        Product product = productMapper.selectById(order.getProductId());
-
-        if (product == null) {
-            throw new NotFoundException("商品不存在");
-        }
-
-        if(!Integer.valueOf(2).equals(product.getStatus())){
-            throw new BusinessException("商品当前不是待支付状态");
-        }
-
-        int updated = productMapper.updateStatusIfLocked(
-                product.getId(),
-                3);
-        if(updated == 0){
+        if (productMapper.updateStatusIfLocked(order.getProductId(), ProductStatus.SOLD.getCode()) == 0) {
             throw new BusinessException("商品状态已发生变化");
         }
-        order.setStatus(2);
-        order.setUpdateTime(LocalDateTime.now());
-
-        orderMapper.updateById(order);
     }
 
     @Override
     @Transactional
     public void cancel(Long id, String username) {
-
-        User user = userMapper.findByUsername(username);
-
-        if (user == null) {
-            throw new UnauthorizedException("用户不存在");
-        }
-
-        Order order = orderMapper.selectById(id);
-
-        if (order == null) {
-            throw new NotFoundException("订单不存在");
-        }
-
+        User user = requireUser(username);
+        Order order = requireOrder(id);
         if (!order.getBuyerId().equals(user.getId())) {
             throw new ForbiddenException("只有买家可以取消订单");
         }
 
-        if (!Integer.valueOf(1).equals(order.getStatus())) {
+        if (orderMapper.cancelIfPending(id) == 0) {
             throw new BusinessException("当前订单不能取消");
         }
-
-        int updated = productMapper.releaseLockedProduct(order.getProductId(),1);
-        if(updated == 0){
+        if (productMapper.releaseLockedProduct(order.getProductId(), ProductStatus.AVAILABLE.getCode()) == 0) {
             throw new BusinessException("商品状态已发生变化");
         }
-        order.setStatus(4);
-        order.setUpdateTime(LocalDateTime.now());
+    }
 
-        orderMapper.updateById(order);
+    private User requireUser(String username) {
+        User user = userMapper.findByUsername(username);
+        if (user == null) {
+            throw new UnauthorizedException("用户不存在");
+        }
+        return user;
+    }
+
+    private Order requireOrder(Long id) {
+        Order order = orderMapper.selectById(id);
+        if (order == null) {
+            throw new NotFoundException("订单不存在");
+        }
+        return order;
     }
 }

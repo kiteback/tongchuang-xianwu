@@ -1,34 +1,69 @@
 package com.tcxw.producer;
 
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.stereotype.Component;
+import com.tcxw.config.RabbitMQConfig;
 import com.tcxw.message.OrderMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import java.time.Duration;
 
 @Component
 public class OrderMessageProducer {
 
-    private final RabbitTemplate rabbitTemplate;
+    private static final Logger log = LoggerFactory.getLogger(OrderMessageProducer.class);
 
-    public OrderMessageProducer(RabbitTemplate rabbitTemplate) {
+    private final RabbitTemplate rabbitTemplate;
+    private final Duration timeout;
+
+    public OrderMessageProducer(RabbitTemplate rabbitTemplate,
+                                @Value("${app.order.timeout:30m}") Duration timeout) {
         this.rabbitTemplate = rabbitTemplate;
+        this.timeout = timeout;
+    }
+
+    public void sendAfterCommit(OrderMessage message) {
+        Runnable sender = () -> {
+            try {
+                sendOrderCreatedMessage(message);
+                sendOrderTimeoutMessage(message);
+            } catch (RuntimeException exception) {
+                log.error("Failed to publish order event {} for order {}", message.getEventId(),
+                        message.getOrderId(), exception);
+            }
+        };
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    sender.run();
+                }
+            });
+        } else {
+            sender.run();
+        }
     }
 
     public void sendOrderCreatedMessage(OrderMessage message) {
         rabbitTemplate.convertAndSend(
-                "order.exchange",
-                "order.created",
+                RabbitMQConfig.ORDER_EXCHANGE,
+                RabbitMQConfig.ORDER_CREATED_KEY,
                 message
         );
     }
 
-    public void sendOrderTimeoutMessage(OrderMessage message){
+    public void sendOrderTimeoutMessage(OrderMessage message) {
         rabbitTemplate.convertAndSend(
                 "",
-                "order.timeout.queue",
+                RabbitMQConfig.ORDER_TIMEOUT_QUEUE,
                 message,
-                messagePostProcessor -> {
-                    messagePostProcessor.getMessageProperties().setExpiration("30000");
-                    return messagePostProcessor;
+                amqpMessage -> {
+                    amqpMessage.getMessageProperties().setExpiration(String.valueOf(timeout.toMillis()));
+                    return amqpMessage;
                 }
         );
     }

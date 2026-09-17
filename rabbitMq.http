@@ -1,2 +1,0 @@
-### RabbitMQ结构化消息测试
-GET http://localhost:8081/rabbitmq-test?orderId=100&userId=9

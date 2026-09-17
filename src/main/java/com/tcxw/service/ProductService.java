@@ -1,7 +1,9 @@
 package com.tcxw.service;
 
-import com.tcxw.entity.Product;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.tcxw.dto.ProductCreateRequest;
+import com.tcxw.dto.ProductUpdateRequest;
+import com.tcxw.entity.Product;
 
 
 public interface ProductService{
@@ -9,9 +11,9 @@ public interface ProductService{
 
     IPage<Product> getAll(int page,int size);
 
-    void add(Product product, String username);
+    Product add(ProductCreateRequest request, String username);
 
-    void update(Product product, String username);
+    Product update(Long id, ProductUpdateRequest request, String username);
 
     void delete(Long id, String username);
 }
